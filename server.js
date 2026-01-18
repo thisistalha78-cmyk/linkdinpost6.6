@@ -6,7 +6,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const app = express();
-app.use(cors());
+app.use(cors()); // ✅ এটা ঠিক আছে
 app.use(express.json());
 
 /* ======================
@@ -22,7 +22,6 @@ app.get("/", (req, res) => {
 app.post("/api/post", async (req, res) => {
   try {
     const { prompt } = req.body;
-
     if (!prompt) {
       return res.status(400).json({ error: "Prompt required" });
     }
@@ -30,8 +29,8 @@ app.post("/api/post", async (req, res) => {
     const orRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json"
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model: "mistralai/mistral-7b-instruct",
@@ -39,23 +38,62 @@ app.post("/api/post", async (req, res) => {
           {
             role: "system",
             content:
-              "You are a professional LinkedIn content writer. Write engaging LinkedIn posts only."
+              "You are a professional LinkedIn content writer. Write engaging LinkedIn posts only.",
           },
           {
             role: "user",
-            content: prompt
-          }
-        ]
-      })
+            content: prompt,
+          },
+        ],
+      }),
     });
 
     const data = await orRes.json();
-    const text = data.choices?.[0]?.message?.content;
-
-    res.json({ post: text });
+    res.json({ post: data.choices?.[0]?.message?.content });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Post generation failed" });
+  }
+});
+
+/* ======================
+   GENERATE (USED BY LANDING PAGE)
+====================== */
+app.post("/api/generate", async (req, res) => {
+  try {
+    const { prompt } = req.body;
+    if (!prompt) {
+      return res.status(400).json({ error: "Prompt required" });
+    }
+
+    const aiRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "mistralai/mistral-7b-instruct",
+        messages: [
+          {
+            role: "system",
+            content: "You write clean, professional LinkedIn posts.",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+      }),
+    });
+
+    const data = await aiRes.json();
+    res.json({
+      result: data.choices?.[0]?.message?.content || "No response",
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "AI generation failed" });
   }
 });
 
@@ -65,7 +103,6 @@ app.post("/api/post", async (req, res) => {
 app.post("/api/video", async (req, res) => {
   try {
     const { query } = req.body;
-
     if (!query) {
       return res.status(400).json({ error: "Query required" });
     }
@@ -76,19 +113,18 @@ app.post("/api/video", async (req, res) => {
       )}&per_page=1`,
       {
         headers: {
-          Authorization: process.env.PEXELS_API_KEY
-        }
+          Authorization: process.env.PEXELS_API_KEY,
+        },
       }
     );
 
     const data = await pxRes.json();
-
     if (!data.videos || data.videos.length === 0) {
       return res.json({ video: null });
     }
 
     const file =
-      data.videos[0].video_files.find(v => v.quality === "hd") ||
+      data.videos[0].video_files.find((v) => v.quality === "hd") ||
       data.videos[0].video_files[0];
 
     res.json({ video: file.link });
@@ -98,7 +134,11 @@ app.post("/api/video", async (req, res) => {
   }
 });
 
+/* ======================
+   START SERVER (LAST)
+====================== */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("Server running on port", PORT);
 });
+
